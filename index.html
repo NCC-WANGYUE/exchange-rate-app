@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>リアルタイム通貨換算</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <h2>リアルタイム通貨換算</h2>
+
+  <input type="number" id="amount" placeholder="金額を入力" min="0">
+  <select id="baseCurrency">
+    <option value="JPY">円 (JPY)</option>
+    <option value="KRW">ウォン (KRW)</option>
+    <option value="SGD">シンガポールドル (SGD)</option>
+  </select>
+
+  <div id="results" class="result"></div>
+  <div id="loading" class="loading" style="display: none;">読み込み中...</div>
+
+  <script>
+    const API_KEY = "489a0b211e221728847c35c4";
+    const currencies = ["JPY","KRW","SGD"];
+    let debounceTimer;
+
+    function debounce(func, delay) {
+      return function() {
+        const context = this;
+        const args = arguments;
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(() => func.apply(context, args), delay);
+      };
+    }
+
+    async function getRates(base) {
+      try {
+        const response = await fetch(`https://v6.exchangerate-api.com/v6/${API_KEY}/latest/${base}`);
+        const data = await response.json();
+        
+        if(data.result !== "success") {
+          throw new Error(data["error-type"] || "不明なエラー");
+        }
+        return data.conversion_rates;
+      } catch (err) {
+        throw new Error(`為替情報の取得に失敗しました: ${err.message}`);
+      }
+    }
+
+    async function updateResults() {
+      const amount = parseFloat(document.getElementById("amount").value);
+      const resultsElement = document.getElementById("results");
+      const loadingElement = document.getElementById("loading");
+      
+      if (isNaN(amount) || amount < 0) {
+        resultsElement.innerHTML = "";
+        loadingElement.style.display = "none";
+        return;
+      }
+
+      resultsElement.innerHTML = "";
+      loadingElement.style.display = "block";
+
+      try {
+        const base = document.getElementById("baseCurrency").value;
+        const rates = await getRates(base);
+        
+        let html = "";
+        currencies.forEach(curr => {
+          if(curr !== base){
+            const converted = (amount * rates[curr]).toFixed(2);
+            html += `${curr}: ${converted} <br>`;
+          }
+        });
+        
+        resultsElement.innerHTML = html;
+      } catch (error) {
+        resultsElement.innerHTML = `<span class="error">${error.message}</span>`;
+      } finally {
+        loadingElement.style.display = "none";
+      }
+    }
+
+    const debouncedUpdate = debounce(updateResults, 500);
+    
+    document.getElementById("amount").addEventListener("input", debouncedUpdate);
+    document.getElementById("baseCurrency").addEventListener("change", updateResults);
+  </script>
+</body>
+</html>
